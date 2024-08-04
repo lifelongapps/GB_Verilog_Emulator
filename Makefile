@@ -15,45 +15,43 @@ OBJDIR = obj_dir
 VERILATOR_INC = C:/msys64/mingw64/share/verilator/include
 
 # Source and object files
-SRCS = $(wildcard $(LIBDIR)/*.c) $(wildcard $(MAINDIR)/*.cpp)
-OBJS = $(SRCS:$(LIBDIR)/%.c=$(OBJDIR)/%.o) $(SRCS:$(MAINDIR)/%.cpp=$(OBJDIR)/%.o)
+C_SRCS = $(wildcard $(LIBDIR)/*.c)
+CPP_SRCS = $(wildcard $(MAINDIR)/*.cpp)
+OBJS = $(C_SRCS:$(LIBDIR)/%.c=$(OBJDIR)/%.o) $(CPP_SRCS:$(MAINDIR)/%.cpp=$(OBJDIR)/%.o)
 TARGET = $(BINDIR)/gbemu
 
 # Verilator files
 VERILOG_SRC = $(wildcard $(VERILOGDIR)/*.v)
-VERILATED_CPP = $(OBJDIR)/verilated.cpp
+VERILATED_CPP = $(OBJDIR)/Vcpu__ALL.cpp
 VERILATOR_O = $(OBJDIR)/Vcpu__ALL.o
 
 # Rules
 all: $(TARGET)
 
 # Ensure Verilator runs and generates Verilated C++ files
-$(VERILATOR_O): $(VERILOG_SRC)
+$(VERILATED_CPP): $(VERILOG_SRC)
 	@mkdir -p $(OBJDIR)
-	verilator --cc $(VERILOG_SRC) --exe --Mdir $(OBJDIR)
+	verilator --cc $(VERILOG_SRC) --Mdir $(OBJDIR)
 	make -C $(OBJDIR) -f Vcpu.mk
 
 # Compile Verilated C++ files, including verilated.cpp
-$(OBJDIR)/%.o: $(OBJDIR)/%.cpp | $(VERILATOR_O)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-# Compile verilated.cpp
-$(OBJDIR)/verilated.o: 
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-# Compile verilator_utils.cpp
-$(OBJDIR)/verilator_utils.o:
+$(OBJDIR)/Vcpu__ALL.o: $(OBJDIR)/Vcpu__ALL.cpp | $(VERILATED_CPP)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Compile C library files with Verilated headers
-$(OBJDIR)/%.o: $(LIBDIR)/%.c | $(VERILATOR_O)
+$(OBJDIR)/%.o: $(LIBDIR)/%.c | $(VERILATED_CPP)
+	@mkdir -p $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# Compile C++ main files with Verilated headers
+$(OBJDIR)/%.o: $(MAINDIR)/%.cpp | $(VERILATED_CPP)
 	@mkdir -p $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Link everything together
-$(TARGET): $(OBJS) $(VERILATOR_O) $(OBJDIR)/verilated.o
+$(TARGET): $(OBJS) $(VERILATOR_O)
 	@mkdir -p $(BINDIR)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(VERILATOR_O) $(OBJDIR)/verilated.o $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(VERILATOR_O) $(LDFLAGS)
 
 # Clean up
 clean:
